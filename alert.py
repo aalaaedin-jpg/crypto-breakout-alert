@@ -16,7 +16,12 @@ STOCKS = {"NVDA","SNDK","TSLA","AAPL","MSTR","COIN","AMZN","GOOGL","META","MSFT"
 CAIRO = datetime.timezone(datetime.timedelta(hours=2))
 TOPIC = os.environ.get("NTFY_TOPIC", "").strip()
 
-def get(p): return json.load(urllib.request.urlopen(API + p, timeout=20))
+def get(p):
+    for attempt in range(3):                      # retry short network hiccups
+        try: return json.load(urllib.request.urlopen(API + p, timeout=20))
+        except Exception:
+            if attempt == 2: raise
+            time.sleep(3)
 def hm(ms): return datetime.datetime.fromtimestamp(ms / 1000, CAIRO).strftime("%H:%M")
 
 def phone(title, msg):
@@ -27,8 +32,15 @@ def phone(title, msg):
 
 def ok(b): return b not in STABLE | EXCLUDE | STOCKS and not (b.endswith("B") and b[:-1] in STOCKS)
 
+def real_coins():
+    """USDT pairs in Binance's normal crypto trading group (drops tokenized stocks like NVDAB/SPCXB and wrapped/stable tokens)."""
+    info = get("exchangeInfo?permissions=SPOT")["symbols"]
+    return {x["symbol"] for x in info if x["quoteAsset"] == "USDT" and x["status"] == "TRADING"
+            and "TRD_GRP_024" in sum(x["permissionSets"], [])}
+
 def top_coins():
-    t = [x for x in get("ticker/24hr") if x["symbol"].endswith("USDT") and ok(x["symbol"][:-4])]
+    real = real_coins()
+    t = [x for x in get("ticker/24hr") if x["symbol"] in real and ok(x["symbol"][:-4])]
     pool = sorted(t, key=lambda x: -float(x["quoteVolume"]))[:30]
     for x in pool:
         x["k"] = get(f"klines?symbol={x['symbol']}&interval=1m&limit={31 + LOOKBACK}")[:-1]  # drop forming candle
