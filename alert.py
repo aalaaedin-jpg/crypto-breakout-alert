@@ -24,6 +24,12 @@ def get(p):
             time.sleep(3)
 def hm(ms): return datetime.datetime.fromtimestamp(ms / 1000, CAIRO).strftime("%H:%M")
 
+def px(v):
+    """Plain decimal price, no 4.43e-06 style."""
+    return f"{v:.10f}".rstrip("0").rstrip(".") if v < 1 else f"{v:,.4f}".rstrip("0").rstrip(".")
+
+def num(t): return "\u2066" + t + "\u2069"     # keep numbers left-to-right inside Arabic text
+
 def phone(title, msg):
     if not TOPIC: print("no NTFY_TOPIC"); return
     req = urllib.request.Request(f"https://ntfy.sh/{TOPIC}", data=msg.encode(),
@@ -73,10 +79,16 @@ for x in coins:
         if key in seen or any(0 <= m["ms"] - t < 30 * 60000 for t in recent): continue   # 30-min cooldown per coin
         seen.add(key)
         sym = x["symbol"][:-4]
-        msg = (f"{sym} الساعة {hm(m['ms'])}: قفل {m['close']:g} بحجم {m['mult']:.1f}x القاعدة\n"
-               f"كسر القاعدة {m['bl']:g} - {m['bh']:g} | السعر دلوقتي {m['now']:g}\n"
-               f"حجم آخر ربع ساعة {m['vol_rise']:.1f}x | شراء ماركت {m['buy']:.0f}% | نص ساعة {m['ch30']:+.2f}%\n"
-               f"أرقام بس، مش نصيحة")
+        msg = "\n".join([
+            f"الشمعة: {num(hm(m['ms']))}",
+            f"الإقفال: {num(px(m['close']))}",
+            f"الحجم: {num(format(m['mult'], '.1f') + 'x')} القاعدة",
+            f"القاعدة: {num(px(m['bl']) + ' - ' + px(m['bh']))}",
+            f"السعر دلوقتي: {num(px(m['now']))}",
+            f"حجم آخر ربع ساعة: {num(format(m['vol_rise'], '.1f') + 'x')}",
+            f"شراء ماركت: {num(format(m['buy'], '.0f') + '%')}",
+            f"تغير نص ساعة: {num(format(m['ch30'], '+.2f') + '%')}",
+            "أرقام بس، مش نصيحة"])
         print("MATCH", msg.replace("\n", " | "))
         phone(f"{sym} breakout + volume", msg)
 json.dump(sorted(s for s in seen if int(s.rsplit("-", 1)[1]) > cut), open("seen.json", "w"))
