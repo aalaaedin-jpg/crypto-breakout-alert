@@ -2,8 +2,10 @@ name: binance-breakout-alert
 on:
   schedule:
     - cron: "*/5 * * * *"      # GitHub may run it late on busy hours
-  workflow_dispatch: {}
-concurrency: { group: scan, cancel-in-progress: false }
+  workflow_dispatch:
+concurrency:
+  group: scan
+  cancel-in-progress: false
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -11,9 +13,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache/restore@v4
-        with: { path: seen.json, key: seen-${{ github.run_id }}, restore-keys: seen- }
+        with:
+          path: seen.json
+          key: seen-${{ github.run_id }}
+          restore-keys: seen-
       - run: python3 alert.py
-        env: { NTFY_TOPIC: "${{ secrets.NTFY_TOPIC }}" }
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
       - uses: actions/cache/save@v4
         if: always()
-        with: { path: seen.json, key: seen-${{ github.run_id }} }
+        with:
+          path: seen.json
+          key: seen-${{ github.run_id }}
